@@ -1,0 +1,336 @@
+#### data from 
+#### http://mrdata.usgs.gov/ree/ree-csv.zip
+#### description http://mrdata.usgs.gov/metadata/of02-189.html
+# host rock
+hs1<-table(hostrock$value)
+hs1<-as.data.frame(hs1)
+hs1<-hs1[order(hs1$Freq),]
+hs1<-hs1[order(hs1$Freq, decreasing = T),]
+# first 15 element appears lager than 10 times.
+a<-as.matrix(unlist(hs1$Var1[1:15]))
+hs_id<-data.frame(matrix(ncol = 16, nrow = 799,dimnames=list(1:799,c("rec_id",a))))
+hs_id$rec_id<-1:799
+
+for (i in 1:799)
+{
+ for (j in 2:16)
+  {
+    if ( any(grepl(a[j-1],hostrock$value[hostrock$rec_id==i])==T))
+      hs_id[i,j]<-1
+    else 
+      hs_id[i,j]<-0
+  }
+  
+}
+
+# minerals
+ree_m<-subset(minerals,minerals$role=="ree")
+ore_m<-subset(minerals,minerals$role=="ore")
+gangue_m<-subset(minerals,minerals$role=="gangue")
+
+# ree
+ree_m1<-table(ree_m$abbr)
+ree_m1<-as.data.frame(ree_m1)
+ree_m1<-ree_m1[order(ree_m1$Freq),]
+ree_m1<-ree_m1[order(ree_m1$Freq, decreasing = T),]
+# first 16 element appears larger than 10 times.
+b1<-as.matrix(unlist(ree_m1$Var1[1:16]))
+ree_m1_id<-data.frame(matrix(ncol = 17, nrow = 799,dimnames=list(1:799,c("rec_id",b1))))
+ree_m1_id$rec_id<-1:799
+
+for (i in 1:799)
+{
+  for (j in 2:17)
+  {
+    if ( any(grepl(b1[j-1],ree_m$abbr[ree_m$rec_id==i])==T))
+      ree_m1_id[i,j]<-1
+    else 
+      ree_m1_id[i,j]<-0
+  }
+  
+}
+
+
+
+# ore
+ore_m1<-table(ore_m$abbr)
+ore_m1<-as.data.frame(ore_m1)
+ore_m1<-ore_m1[order(ore_m1$Freq),]
+ore_m1<-ore_m1[order(ore_m1$Freq, decreasing = T),]
+# first 44 element appears larger than 10 times.
+b2<-as.matrix(unlist(ore_m1$Var1[1:44]))
+ore_m1_id<-data.frame(matrix(ncol = 45, nrow = 799,dimnames=list(1:799,c("rec_id",b2))))
+ore_m1_id$rec_id<-1:799
+
+for (i in 1:799)
+{
+  for (j in 2:45)
+  {
+    if ( any(grepl(b2[j-1],ore_m$abbr[ore_m$rec_id==i])==T))
+      ore_m1_id[i,j]<-1
+    else 
+      ore_m1_id[i,j]<-0
+  }
+  
+}
+
+# gangue
+gangue_m1<-table(gangue_m$abbr)
+gangue_m1<-as.data.frame(gangue_m1)
+gangue_m1<-gangue_m1[order(gangue_m1$Freq),]
+gangue_m1<-gangue_m1[order(gangue_m1$Freq, decreasing = T),]
+# first 29 element appears larger than 10 times.
+b3<-as.matrix(unlist(gangue_m1$Var1[1:29]))
+gangue_m1_id<-data.frame(matrix(ncol = 30, nrow = 799,dimnames=list(1:799,c("rec_id",b3))))
+gangue_m1_id$rec_id<-1:799
+
+for (i in 1:799)
+{
+  for (j in 2:30)
+  {
+    if ( any(grepl(b3[j-1],gangue_m$abbr[gangue_m$rec_id==i])==T))
+      gangue_m1_id[i,j]<-1
+    else 
+      gangue_m1_id[i,j]<-0
+  }
+  
+}
+
+
+#########
+# deposit type
+dept<-as.matrix(unique(geo1$deptype))
+dept_id<-data.frame(matrix(ncol = 18, nrow = 799,dimnames=list(1:799,c("rec_id",dept))))
+dept_id$rec_id<-1:799
+
+for (i in 1:799)
+{
+  for (j in 2:18)
+  {
+    if (dept[j-1]==geo1$deptype[i])
+      dept_id[i,j]<-1
+    else 
+      dept_id[i,j]<-0
+  }
+  
+}
+
+
+
+##########################################################
+# Combine main and hs_id, ree_m1_id
+geo1<-merge(main, hs_id, by = "rec_id", all=T)
+geo1<-geo1[,c(1,2,12:28)]
+geo1<-merge(geo1, ree_m1_id, by = "rec_id", all=T)
+geo1<-merge(geo1, dept_id, by = "rec_id", all=T)
+geo1<-merge(geo1, ore_m1_id, by = "rec_id", all=T)
+geo1<-merge(geo1, gangue_m1_id, by = "rec_id", all=T)
+# geo1: col of 5:19 hostrock; col of 20:35 ree; col of 36:52 dept;
+# col of 53:96 ore ; col of 97:125 gangue 
+
+#### decision tree
+######### http://www.statmethods.net/advstats/cart.html Quick R
+# Classification Tree with rpart
+library(rpart)
+
+# grow tree 
+fit <- rpart(mon ~ .-rec_id -deptype,
+             method="class", data=geo1)
+
+printcp(fit) # display the results 
+plotcp(fit) # visualize cross-validation results 
+summary(fit) # detailed summary of splits
+
+# plot tree 
+plot(fit, uniform=TRUE, 
+     main="Classification Tree for REE_Mineralogy: mon")
+text(fit, use.n=TRUE, all=TRUE, cex=.8)
+
+# create attractive postscript plot of tree 
+post(fit, file = "/Users/qicui/Desktop/DDL/treemon.ps", 
+     title = "Classification Tree for REE_Mineralogy: mon")
+
+##### logistic
+library(aod)
+library(ggplot2)
+logit.mon <- glm(mon ~ latitude + longitude
+                 # host rock
+                 + as.factor(beach.sand) + as.factor(mudstone) + as.factor(sand) 
+                 # ree
+                 + as.factor(bas) + as.factor(all)
+                 # dept
+                 + as.factor(phos) + as.factor(placer.sh) + as.factor(placer.al) + as.factor(placer.unc) 
+                 # ore
+                 + as.factor(zir) + as.factor(ilm) + as.factor(rut) + as.factor(cas)
+                 + as.factor(col) + as.factor(coll) + as.factor(van)  + as.factor(au) + as.factor(leu)
+                 # gangue
+                 + as.factor(cly) + as.factor(qtz)
+                 , data = geo1, family = "binomial")
+summary(logit.mon)
+
+logit.mon1 <- glm(mon ~ # ree
+                          as.factor(bas)
+                        # dept
+                        + as.factor(placer.sh)+ as.factor(placer.al) 
+                        # ore
+                        + as.factor(zir) + as.factor(col)
+                        # gangue
+                        + as.factor(qtz)
+                 , data = geo1, family = "binomial")
+summary(logit.mon1)
+
+####### Concordance:
+###  http://rforwork.info/2012/03/21/logistic-regression-in-r-concordance-and-discordance-testing/
+## Concordance
+Concordance(logit.mon1)
+
+m1 <- glm(mon ~ latitude+longitude
+                  , data = geo1, family = "binomial")
+summary(m1)
+Concordance(m1)
+
+
+
+
+
+
+#############
+fit1 <- rpart(xen ~ .-rec_id -deptype,
+             method="class", data=geo1)
+
+printcp(fit1) # display the results 
+plotcp(fit1) # visualize cross-validation results 
+summary(fit1) # detailed summary of splits
+
+# plot tree 
+plot(fit1, uniform=TRUE, 
+     main="Classification Tree for REE_Mineralogy: xen")
+text(fit1, use.n=TRUE, all=TRUE, cex=.8)
+
+# create attractive postscript plot of tree 
+post(fit1, file = "/Users/qicui/Desktop/DDL/treexen.ps", 
+     title = "Classification Tree for REE_Mineralogy: xen")
+
+##### logistic
+
+logit.xen <- glm(xen ~ latitude + longitude + as.factor(qtz) + as.factor(zir) + as.factor(ilm) + as.factor(cas)
+                 + as.factor(placer.sh) + as.factor(mon) + as.factor(thor) + as.factor(pyr) + as.factor(pyro.x)
+                 + as.factor(sand) + as.factor(rut) + as.factor(u) + as.factor(leu) + as.factor(p) + as.factor(alk.ig)
+                 + as.factor(kya)+ as.factor(hem) + as.factor(rie) + as.factor(prv) + as.factor(granite) + as.factor(syenite)
+                 , data = geo1, family = "binomial")
+summary(logit.xen)
+
+logit.xen1 <- glm(xen ~ + as.factor(mon)
+                  + as.factor(cas) + as.factor(thor)+ as.factor(leu) + as.factor(hem)
+                  , data = geo1, family = "binomial")
+summary(logit.xen1)
+
+which(grepl("cas",colnames(geo1)))
+
+## Concordance
+Concordance(logit.xen1)
+
+
+
+#############
+fit2 <- rpart(bas ~ .-rec_id -deptype,
+              method="class", data=geo1)
+
+printcp(fit2) # display the results 
+plotcp(fit2) # visualize cross-validation results 
+summary(fit2) # detailed summary of splits
+
+# plot tree 
+plot(fit2, uniform=TRUE, 
+     main="Classification Tree for REE_Mineralogy: bas")
+text(fit2, use.n=TRUE, all=TRUE, cex=.8)
+
+# create attractive postscript plot of tree 
+post(fit2, file = "/Users/qicui/Desktop/DDL/treebas.ps", 
+     title = "Classification Tree for REE_Mineralogy: bas")
+
+##### logistic
+
+logit.bas <- glm(bas ~ latitude + longitude + as.factor(par) + as.factor(flu) + as.factor(bio) + as.factor(thor)
+                 + as.factor(nepheline.syenite) + as.factor(alb) + as.factor(mcc) + as.factor(pyro.y)
+                 + as.factor(aeg) + as.factor(ast) + as.factor(qtz) + as.factor(syenite)
+                 + as.factor(th) + as.factor(xen) + as.factor(sod) + as.factor(mon)
+                 + as.factor(syn) + as.factor(hem) + as.factor(amph) + as.factor(col)
+                 , data = geo1, family = "binomial")
+
+                
+summary(logit.bas)
+# geo1: col of 5:19 hostrock; col of 20:35 ree; col of 36:52 dept;
+# col of 53:96 ore ; col of 97:125 gangue 
+logit.bas1 <- glm(bas ~ latitude + longitude + as.factor(par) 
+                  + as.factor(flu) + as.factor(pyro.y) + as.factor(th) + as.factor(hem)
+                 , data = geo1, family = "binomial")
+summary(logit.bas1)
+## Concordance
+Concordance(logit.bas1)
+
+
+
+
+
+
+##########################
+# TS
+### Data from http://minerals.usgs.gov/minerals/pubs/historical-statistics/ds140-raree.xlsx
+### http://minerals.usgs.gov/minerals/pubs/historical-statistics/#rareearths
+# save a numeric vector containing 48 monthly observations
+# from Jan 2009 to Dec 2014 as a time series object
+plot(myts)
+myts <- ts(ree_stat$World.production, start=c(1900), end=c(2013), frequency=1) 
+lag.plot(myts, do.lines=F)
+acf(myts,113)
+ts.plot(filter(myts,rep(1,5),method="convolution"))
+Box.test(myts, lag = 10, type ="Ljung-Box")
+# stationary
+acf(myts, lag.max=20)             # plot a correlogram
+acf(myts, lag.max=20, plot=FALSE) # get the autocorrelation values
+pacf(myts, lag.max=20)             # plot a partial correlogram
+pacf(myts, lag.max=20, plot=FALSE) # get the partial autocorrelation values
+
+auto.arima(myts)
+# ARIMA(3,0,0) with non-zero mean 
+mytsa <- arima(myts, order=c(3,0,0)) # fit an ARIMA(3,0,0) model
+mytsa
+myts_forecasts <- forecast.Arima(mytsa, h=20)
+myts_forecasts
+plot.forecast(myts_forecasts)
+
+acf(myts_forecasts$residuals, lag.max=20)
+Box.test(myts_forecasts$residuals, lag=20, type="Ljung-Box")
+
+plot.ts(myts_forecasts$residuals)            # make time plot of forecast errors
+plotForecastErrors(myts_forecasts$residuals)
+mean(myts_forecasts$residuals)
+
+
+
+
+
+######
+plotForecastErrors <- function(forecasterrors)
+{
+  # make a histogram of the forecast errors:
+  mybinsize <- IQR(forecasterrors)/4
+  mysd   <- sd(forecasterrors)
+  mymin  <- min(forecasterrors) - mysd*5
+  mymax  <- max(forecasterrors) + mysd*3
+  # generate normally distributed data with mean 0 and standard deviation mysd
+  mynorm <- rnorm(10000, mean=0, sd=mysd)
+  mymin2 <- min(mynorm)
+  mymax2 <- max(mynorm)
+  if (mymin2 < mymin) { mymin <- mymin2 }
+  if (mymax2 > mymax) { mymax <- mymax2 }
+  # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+  mybins <- seq(mymin, mymax, mybinsize)
+  hist(forecasterrors, col="red", freq=FALSE, breaks=mybins)
+  # freq=FALSE ensures the area under the histogram = 1
+  # generate normally distributed data with mean 0 and standard deviation mysd
+  myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+  # plot the normal curve as a blue line on top of the histogram of forecast errors:
+  points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+}
